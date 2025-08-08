@@ -1,4 +1,7 @@
 ﻿using System;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -23,7 +26,8 @@ namespace ZeroRP
         private RTHandle _colorRTHandle;
         private RTHandle _depthRTHandle;
 
- 
+        private GBufferPass _gBufferPass = new GBufferPass();
+        private DeferredPass _deferredPass = new DeferredPass();
 
         public void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
@@ -39,8 +43,17 @@ namespace ZeroRP
             {
                 AddClearRenderTargetPass(renderGraph, cameraData);
             }
-            
-            AddDrawOpaqueObjectsPass(renderGraph, cameraData);
+
+            _gBufferPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
+            _deferredPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
+            // AddDrawOpaqueObjectsPass(renderGraph, cameraData);
+
+            // AddDrawSkyBoxPass(renderGraph, cameraData);
+          
+
+            //Editor
+            AddEditorRenderTargetPass(renderGraph);
+            AddDrawEditorGizmoPass(renderGraph, cameraData, GizmoSubset.PreImageEffects);
         }
 
 
@@ -139,90 +152,82 @@ namespace ZeroRP
         #endregion
 
 
-        #region Draw Opaque Objects
+        // #region Draw Opaque Objects
 
-        internal class DrawOpaqueObjectsPassData
+        // internal class DrawOpaqueObjectsPassData
+        // {
+        //     internal RendererListHandle OpaqueRendererListHandle { get; set; }
+        // }
+
+        // private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
+        // {
+        //     using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
+        //     {
+        //         //创建不透明对象渲染列表
+        //         var opaqueRendererDesc = new RendererListDesc(ShaderTagIds, cameraData.CullingResults, cameraData.Camera);
+        //         opaqueRendererDesc.sortingCriteria = SortingCriteria.CommonOpaque;
+        //         opaqueRendererDesc.renderQueueRange = RenderQueueRange.opaque;
+        //         passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
+        //         //RenderGraph引用不透明渲染列表
+        //         builder.UseRendererList(passData.OpaqueRendererListHandle);
+
+
+        //         if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
+        //         if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
+
+
+        //         builder.AllowPassCulling(false);
+        //         //TODO 啥意思呢
+        //         builder.AllowGlobalStateModification(true);
+
+        //         builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) => { });
+        //     }
+        // }
+
+        // #endregion
+
+        #region Draw Skybox
+        internal class SkyBoxPassData
         {
-            internal RendererListHandle OpaqueRendererListHandle { get; set; }
+            internal RendererListHandle skyboxRenderListHandle;
         }
-
-        private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
+        private void AddDrawSkyBoxPass(RenderGraph renderGraph, CameraData cameraData)
         {
-            using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
+            using (var builder =
+                   renderGraph.AddRasterRenderPass<SkyBoxPassData>("Draw SkyBox Pass", out var passData))
             {
-                //创建不透明对象渲染列表
-                var opaqueRendererDesc = new RendererListDesc(ShaderTagIds, cameraData.CullingResults, cameraData.Camera);
-                opaqueRendererDesc.sortingCriteria = SortingCriteria.CommonOpaque;
-                opaqueRendererDesc.renderQueueRange = RenderQueueRange.opaque;
-                passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
-                //RenderGraph引用不透明渲染列表
-                builder.UseRendererList(passData.OpaqueRendererListHandle);
+                passData.skyboxRenderListHandle = renderGraph.CreateSkyboxRendererList(cameraData.Camera);
+                builder.UseRendererList(passData.skyboxRenderListHandle);
 
-
-                if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
-                if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
-                
+                if (_colorHandle.IsValid())
+                    builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
+                if (_depthHandle.IsValid())
+                    builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
 
                 builder.AllowPassCulling(false);
-                //TODO 无法理解
-                builder.AllowGlobalStateModification(true);
 
-                builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) =>
+                builder.SetRenderFunc((SkyBoxPassData data, RasterGraphContext context) =>
                 {
-                   Debug.Log("Draw Opaque Objects Pass");
+                    context.cmd.DrawRendererList(data.skyboxRenderListHandle);
                 });
             }
         }
 
         #endregion
 
-        #region Draw Skybox
-
-        #endregion
-        
         #region Draw Transparent Objects
 
         #endregion
 
 
-        #region Editor Preview
-
-        
- internal class DrawEditorGizmoPassData
-        {
-            internal RendererListHandle GizmoRendererListHandle;
-        }
-
-        private void AddDrawEditorGizmoPass(RenderGraph renderGraph, CameraData cameraData, GizmoSubset gizmoSubset)
-        {
-#if UNITY_EDITOR
-            if(!Handles.ShouldRenderGizmos() || cameraData.camera.sceneViewFilterMode == Camera.SceneViewFilterMode.ShowFiltered)
-                return;
-            
-            bool renderPreGizmos = (gizmoSubset == GizmoSubset.PreImageEffects);
-            var passName = renderPreGizmos ? "Draw Pre Gizmos Pass" : "Draw Post Gizmos Pass";
-            using (var builder = renderGraph.AddRasterRenderPass<DrawEditorGizmoPassData>(passName, out var passData,
-                       s_DrawEditorGizmoProfilingSampler))
-            {
-                if (m_BackbufferColorHandle.IsValid())
-                    builder.SetRenderAttachment(m_BackbufferColorHandle, 0, AccessFlags.Write);
-                if (m_BackbufferDepthHandle.IsValid())
-                    builder.SetRenderAttachmentDepth(m_BackbufferDepthHandle, AccessFlags.Read);
-
-                passData.gizmoRendererListHandle = renderGraph.CreateGizmoRendererList(cameraData.camera, gizmoSubset);
-                builder.UseRendererList(passData.gizmoRendererListHandle);
-                builder.AllowPassCulling(false);
-                
-                builder.SetRenderFunc((DrawEditorGizmoPassData data, RasterGraphContext context) =>
-                {
-                    context.cmd.DrawRendererList(data.gizmoRendererListHandle);
-                });
-            }
-#endif
-        #endregion
+        partial void AddEditorRenderTargetPass(RenderGraph renderGraph);
+        partial void AddDrawEditorGizmoPass(RenderGraph renderGraph, CameraData cameraData, GizmoSubset gizmoSubset);
 
         public void Dispose()
         {
         }
+
+
+     
     }
 }

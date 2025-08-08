@@ -2,12 +2,14 @@
 #define LIGHT_HLSL
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+
 #define MAX_LIGHT_COUNT 1024
 #define MAX_LIGHT_COUNT_PER_TILE 32
+
 CBUFFER_START(_CustomLight)
     float4 _MainLightDirection;
     float4 _MainLightColor;
-
 CBUFFER_END
 
 

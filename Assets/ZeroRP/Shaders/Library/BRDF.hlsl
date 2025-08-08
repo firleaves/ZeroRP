@@ -5,6 +5,16 @@
 
 #define kDielectricSpec half4(0.04, 0.04, 0.04, 1.0 - 0.04) // standard dielectric reflectivity coef at incident angle (= 4%)
 
+
+struct BRDFData
+{
+    half3 albedo;
+    half3 diffuse;
+    half3 specular;
+    half reflectivity;
+    half roughness;
+};
+
 half OneMinusReflectivityMetallic(half metallic)
 {
     // We'll need oneMinusReflectivity, so
@@ -14,6 +24,22 @@ half OneMinusReflectivityMetallic(half metallic)
     //                  = alpha - metallic * alpha
     half oneMinusDielectricSpec = kDielectricSpec.a;
     return oneMinusDielectricSpec - metallic * oneMinusDielectricSpec;
+}
+
+
+ void InitializeBRDFData(half3 albedo, half metallic,  half smoothness, out BRDFData outBRDFData)
+{
+    half oneMinusReflectivity = OneMinusReflectivityMetallic(metallic);
+    half reflectivity = half(1.0) - oneMinusReflectivity;
+    half3 brdfDiffuse = albedo * oneMinusReflectivity;
+    half3 brdfSpecular = lerp(kDielectricSpec.rgb, albedo, metallic);
+
+    outBRDFData = (BRDFData)0;
+    outBRDFData.albedo = albedo;
+    outBRDFData.diffuse = brdfDiffuse;
+    outBRDFData.specular = brdfSpecular;
+    outBRDFData.reflectivity = reflectivity;
+    outBRDFData.roughness = PerceptualSmoothnessToRoughness(smoothness);
 }
 
 
@@ -34,7 +60,7 @@ float DistributionGGX(float NdotH, float roughness)
     return nom / denom;
 }
 
-//F  菲涅尔函数
+//F 
 float3 FresnelSchlick(float cosTheta, float3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
@@ -51,19 +77,16 @@ float GeometrySchlickGGX(float NdotV, float roughness)
     return nom / denom;
 }
 
-// G  几何函数
+// G  
 float GeometrySmith(float NdotV, float NdotL, float roughness)
 {
-    //出射遮蔽
     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
 
-    //入射遮蔽
     float ggx1 = GeometrySchlickGGX(NdotL, roughness);
     return ggx1 * ggx2;
 }
 
 
-// 直接光 漫反射+ 镜面反射
 float3 DirectBRDF(float3 N, float3 V, float3 L, float3 albedo, float3 radiance, float roughness, float metallic)
 {
     //unity内限制 roughness 范围，保证光滑度=0的时候，还保留一点高光效果
@@ -103,19 +126,9 @@ float3 DirectBRDF(float3 N, float3 V, float3 L, float3 albedo, float3 radiance, 
     return color;
 }
 
-float3 IndirectIBL(float3 N, float3 V, float3 albedo, float roughness, float metallic, samplerCUBE sampler_diffuseIBL, samplerCUBE sampler_specularIBL, sampler2D sampler_brdfLut)
+float3 IndirectIBL(float3 N, float3 V, float3 albedo, float roughness, float metallic, samplerCUBE sampler_diffuseIBL,
+                   samplerCUBE sampler_specularIBL, sampler2D sampler_brdfLut)
 {
-    // float3 H = normalize(V + L);
-    // float NdotH = max(dot(N, H), 0.0);
-    // float NdotL = max(dot(N, L), 0.0);
-    // float3 F = FresnelSchlick(NdotH, F0);
-    // float D = DistributionGGX(N, H, roughness);
-    // float G = GeometrySmith(N, V, L, roughness);
-    // float4 kS = float4(0.04, 0.04, 0.04, 0.04);
-    // float4 kD = float4(0.04, 0.04, 0.04, 0.04);
-    // float3 nominator = kD * D * G * F;
-    // float denominator = 4.0 * NdotL * (1.0 - kS) + 0.0001;
-    // return nominator / denominator;
     return 0;
 }
 

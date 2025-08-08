@@ -8,6 +8,9 @@ namespace ZeroRP
 {
     public class ZeroRenderPipeline : RenderPipeline
     {
+
+        public const string ShaderTagName = "ZeroRP";
+
         private RenderGraph _renderGraph;
         private ZeroRPRenderGraphRecorder _renderGraphRecorder;
         private ContextContainer _contextContainer;
@@ -22,9 +25,9 @@ namespace ZeroRP
 
         protected override void Dispose(bool disposing)
         {
-            
+
             CleanupRenderGraph();
-            
+
             base.Dispose(disposing);
         }
 
@@ -63,6 +66,7 @@ namespace ZeroRP
                 RenderCamera(context, camera);
             }
 
+            //渲染结束，需要调用该API
             _renderGraph.EndFrame();
             EndContextRendering(context, cameras);
         }
@@ -103,7 +107,9 @@ namespace ZeroRP
             CameraData cameraData = _contextContainer.GetOrCreate<CameraData>();
             cameraData.Camera = camera;
             cameraData.CullingResults = cullingResults;
-            
+
+
+            _contextContainer.GetOrCreate<DeferredData>();
             return true;
         }
 
@@ -118,9 +124,57 @@ namespace ZeroRP
                 currentFrameIndex = Time.frameCount
             };
             _renderGraph.BeginRecording(renderGraphParameters);
-            //开启录制时间线
+            //录制时间线
             _renderGraphRecorder.RecordRenderGraph(_renderGraph, _contextContainer);
             _renderGraph.EndRecordingAndExecute();
+        }
+
+        public static TextureHandle CreateRenderGraphTexture(RenderGraph renderGraph, RenderTextureDescriptor desc, string name, bool clear,
+ FilterMode filterMode = FilterMode.Point, TextureWrapMode wrapMode = TextureWrapMode.Clamp)
+        {
+            TextureDesc rgDesc = new TextureDesc(desc.width, desc.height);
+            rgDesc.dimension = desc.dimension;
+            rgDesc.clearBuffer = clear;
+            rgDesc.bindTextureMS = desc.bindMS;
+            rgDesc.format = (desc.depthStencilFormat != GraphicsFormat.None) ? desc.depthStencilFormat : desc.graphicsFormat;
+            rgDesc.slices = desc.volumeDepth;
+            rgDesc.msaaSamples = (MSAASamples)desc.msaaSamples;
+            rgDesc.name = name;
+            rgDesc.enableRandomWrite = desc.enableRandomWrite;
+            rgDesc.filterMode = filterMode;
+            rgDesc.wrapMode = wrapMode;
+            rgDesc.isShadowMap = desc.shadowSamplingMode != ShadowSamplingMode.None && desc.depthStencilFormat != GraphicsFormat.None;
+            rgDesc.vrUsage = desc.vrUsage;
+            rgDesc.useDynamicScale = desc.useDynamicScale;
+            rgDesc.useDynamicScaleExplicit = desc.useDynamicScaleExplicit;
+
+            return renderGraph.CreateTexture(rgDesc);
+        }
+
+        internal static RenderTextureDescriptor CreateRenderTextureDescriptor(Camera camera, int msaaSamples)
+        {
+            RenderTextureDescriptor desc;
+
+            if (camera.targetTexture == null)
+            {
+                desc = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight);
+                desc.graphicsFormat = SystemInfo.GetGraphicsFormat(DefaultFormat.LDR);
+
+                desc.sRGB = true;
+            }
+            else
+            {
+                desc = camera.targetTexture.descriptor;
+
+                desc.width = camera.pixelWidth;
+                desc.height = camera.pixelHeight;
+            }
+            desc.enableRandomWrite = false;
+            desc.bindMS = false;
+            desc.useDynamicScale = camera.allowDynamicResolution;
+            desc.msaaSamples = msaaSamples;
+
+            return desc;
         }
     }
 }
