@@ -1,7 +1,7 @@
 ﻿#ifndef BRDF_HLSL
 #define BRDF_HLSL
 
-#define PI  3.14159265359
+// #define PI  3.14159265359
 
 #define kDielectricSpec half4(0.04, 0.04, 0.04, 1.0 - 0.04) // standard dielectric reflectivity coef at incident angle (= 4%)
 

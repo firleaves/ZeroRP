@@ -56,16 +56,16 @@
             {
                 "LightMode" = "GBuffer"
             }
-//            Blend[_SrcBlend][_DstBlend]
-//            ZWrite[_ZWrite]
-//            Cull[_Cull]
+        //    Blend[_SrcBlend][_DstBlend]
+           ZWrite On
+        //    Cull[_Cull]
 
             HLSLPROGRAM
-            // #pragma target 4.5
+            #pragma target 4.5
 
             // Deferred Rendering Path does not support the OpenGL-based graphics API:
             // Desktop OpenGL, OpenGL ES 3.0, WebGL 2.0.
-            #pragma exclude_renderers gles3 glcore
+            // #pragma exclude_renderers gles3 glcore
 
             // -------------------------------------
             // Shader Stages

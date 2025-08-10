@@ -9,11 +9,15 @@ namespace ZeroRP
     {
 
 
-        public override string renderPipelineShaderTag => ZeroRenderPipeline.ShaderTagName;
+        // public override string renderPipelineShaderTag => ZeroRenderPipeline.ShaderTagName;
 
-        protected override RenderPipeline CreatePipeline()
+        // protected override RenderPipeline CreatePipeline()
+        // {
+        //     return new ZeroRenderPipeline(this);
+        // }
+         protected override RenderPipeline CreatePipeline()
         {
-            return new ZeroRenderPipeline(this);
+            return new ZeroRenderPipeline();
         }
     }
 }
