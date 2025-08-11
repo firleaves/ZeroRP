@@ -17,9 +17,11 @@ namespace ZeroRP
         private static readonly ShaderTagId[] ShaderTagIds = new ShaderTagId[]
         {
             new ShaderTagId("SRPDefaultUnlit"),
-            new ShaderTagId("ZeroRPForward")
+            new ShaderTagId("ExampleLightModeTag")
         }; //渲染标签IDs
 
+        private static readonly ShaderTagId s_shaderTagId = new ShaderTagId("SRPDefaultUnlit"); //渲染标签ID
+        
         private TextureHandle _colorHandle;
         private TextureHandle _depthHandle;
 
@@ -39,16 +41,16 @@ namespace ZeroRP
 
             var clearFlags = cameraData.GetClearFlags();
 
-            if (clearFlags != RTClearFlags.None)
-            {
-                AddClearRenderTargetPass(renderGraph, cameraData);
-            }
-
+            // if (clearFlags != RTClearFlags.None)
+            // {
+            //     AddClearRenderTargetPass(renderGraph, cameraData);
+            // }
+            //
             _gBufferPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
             _deferredPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
-            // AddDrawOpaqueObjectsPass(renderGraph, cameraData);
+            AddDrawOpaqueObjectsPass(renderGraph, cameraData);
 
-            // AddDrawSkyBoxPass(renderGraph, cameraData);
+            AddDrawSkyBoxPass(renderGraph, cameraData);
           
 
             //Editor
@@ -98,8 +100,8 @@ namespace ZeroRP
             RenderTargetInfo importInfoDepth;
             if (isBuildInTexture)
             {
-                importInfoColor.width = Screen.width;
-                importInfoColor.height = Screen.height;
+                importInfoColor.width = cameraData.Camera.pixelWidth;
+                importInfoColor.height = cameraData.Camera.pixelHeight;
                 importInfoColor.volumeDepth = 1;
                 importInfoColor.msaaSamples = 1;
                 importInfoColor.format = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB);
@@ -152,39 +154,44 @@ namespace ZeroRP
         #endregion
 
 
-        // #region Draw Opaque Objects
+        #region Draw Opaque Objects
 
-        // internal class DrawOpaqueObjectsPassData
-        // {
-        //     internal RendererListHandle OpaqueRendererListHandle { get; set; }
-        // }
+        internal class DrawOpaqueObjectsPassData
+        {
+            internal TextureHandle backbufferHandle;
+            internal RendererListHandle OpaqueRendererListHandle { get; set; }
+        }
 
-        // private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
-        // {
-        //     using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
-        //     {
-        //         //创建不透明对象渲染列表
-        //         var opaqueRendererDesc = new RendererListDesc(ShaderTagIds, cameraData.CullingResults, cameraData.Camera);
-        //         opaqueRendererDesc.sortingCriteria = SortingCriteria.CommonOpaque;
-        //         opaqueRendererDesc.renderQueueRange = RenderQueueRange.opaque;
-        //         passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
-        //         //RenderGraph引用不透明渲染列表
-        //         builder.UseRendererList(passData.OpaqueRendererListHandle);
+        private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
+        {
+            using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
+            {
+                //创建不透明对象渲染列表
+                var opaqueRendererDesc = new RendererListDesc(s_shaderTagId, cameraData.CullingResults, cameraData.Camera);
+                opaqueRendererDesc.sortingCriteria = SortingCriteria.CommonOpaque;
+                opaqueRendererDesc.renderQueueRange = RenderQueueRange.opaque;
+                passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
+                //RenderGraph引用不透明渲染列表
+                builder.UseRendererList(passData.OpaqueRendererListHandle);
 
+                // passData.backbufferHandle = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CurrentActive);
+                // builder.SetRenderAttachment(passData.backbufferHandle, 0, AccessFlags.Write);
+                if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
+                if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
 
-        //         if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
-        //         if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
+                builder.AllowPassCulling(false);
+                // builder.AllowPassCulling(false);
+                // //TODO 啥意思呢
+                // builder.AllowGlobalStateModification(true);
 
+                builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) =>
+                {
+                    context.cmd.DrawRendererList(data.OpaqueRendererListHandle);
+                });
+            }
+        }
 
-        //         builder.AllowPassCulling(false);
-        //         //TODO 啥意思呢
-        //         builder.AllowGlobalStateModification(true);
-
-        //         builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) => { });
-        //     }
-        // }
-
-        // #endregion
+        #endregion
 
         #region Draw Skybox
         internal class SkyBoxPassData

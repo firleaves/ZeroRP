@@ -47,7 +47,9 @@ namespace ZeroRP
             using (var builder = renderGraph.AddRasterRenderPass<DrawEditorGizmoPassData>(passName, out var passData))
             {
                 if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
-                if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Read);
+                if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
+                
+             
 
                 passData.GizmoRendererListHandle = renderGraph.CreateGizmoRendererList(cameraData.Camera, gizmoSubset);
                 builder.UseRendererList(passData.GizmoRendererListHandle);

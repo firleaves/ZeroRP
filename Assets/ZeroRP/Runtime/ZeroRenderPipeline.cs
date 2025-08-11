@@ -15,11 +15,11 @@ namespace ZeroRP
         private ZeroRPRenderGraphRecorder _renderGraphRecorder;
         private ContextContainer _contextContainer;
 
-        private ZeroRPAsset _asset = null;
+        // private ZeroRPAsset _asset = null;
 
-        public ZeroRenderPipeline(ZeroRPAsset asset)
+        public ZeroRenderPipeline()
         {
-            _asset = asset;
+         
             InitializeRenderGraph();
         }
 
@@ -34,20 +34,31 @@ namespace ZeroRP
 
         private void InitializeRenderGraph()
         {
-            _renderGraph = new RenderGraph("ZeroRP Render Graph");
+            // _renderGraph = new RenderGraph("ZeroRPRenderGraph");
+            // _renderGraphRecorder = new ZeroRPRenderGraphRecorder();
+            // _contextContainer = new ContextContainer();
+            
+            _renderGraph = new RenderGraph("LiteRPRenderGraph");
             _renderGraphRecorder = new ZeroRPRenderGraphRecorder();
             _contextContainer = new ContextContainer();
         }
 
         private void CleanupRenderGraph()
         {
-            _renderGraphRecorder?.Dispose();
+            // _contextContainer.Dispose();
+            // _contextContainer = null;
+            //
+            // _renderGraphRecorder?.Dispose();
+            // _renderGraphRecorder = null;
+            //
+            //
+            // _renderGraph.Cleanup();
+            // _renderGraph = null;
+            
+            _contextContainer?.Dispose();
+            _contextContainer = null;
             _renderGraphRecorder = null;
-
-            _renderGraphRecorder?.Dispose();
-            _renderGraphRecorder = null;
-
-            _renderGraph.Cleanup();
+            _renderGraph?.Cleanup();
             _renderGraph = null;
         }
 
@@ -58,16 +69,18 @@ namespace ZeroRP
 
         protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
         {
+            //开始渲染上下文
             BeginContextRendering(context, cameras);
-
+            
+            //遍历渲染相机
             for (int i = 0; i < cameras.Count; i++)
             {
                 Camera camera = cameras[i];
                 RenderCamera(context, camera);
             }
-
-            //渲染结束，需要调用该API
+            //结束渲染图
             _renderGraph.EndFrame();
+            //结束渲染上下文
             EndContextRendering(context, cameras);
         }
 
@@ -76,14 +89,20 @@ namespace ZeroRP
             BeginCameraRendering(context, camera);
             if (!PrepareFrameData(context, camera))
                 return;
-            CommandBuffer cmd = CommandBufferPool.Get($"Render Camera : {camera.name}");
-            SetupPerCameraShaderConstants(cmd);
+            CommandBuffer cmd = CommandBufferPool.Get(camera.name);
+            // SetupPerCameraShaderConstants(cmd);
+            
+            //!!!! 应为没有设置camera属性，导致一直渲染不出来
+            context.SetupCameraProperties(camera);
             RecordAndExecuteRenderGraph(context, camera, cmd);
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
             CommandBufferPool.Release(cmd);
             context.Submit();
             EndCameraRendering(context, camera);
+            
+            
+         
         }
 
         private void SetupPerCameraShaderConstants(CommandBuffer cmd)

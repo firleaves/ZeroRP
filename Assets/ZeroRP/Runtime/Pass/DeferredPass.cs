@@ -86,7 +86,7 @@ namespace ZeroRP
             var deferredData = frameData.Get<DeferredData>();
             using (var builder = renderGraph.AddRasterRenderPass<PassData>(PassName, out var passData, _profilingSampler))
             {
-                for (int i = 0; i < 2; ++i)
+                for (int i = 0; i < 3; ++i)
                 {
                     builder.UseTexture(deferredData.GBuffer[i], AccessFlags.Read);
                 }

@@ -1,5 +1,5 @@
-//Shader "ZeroRP/Unlit"
-//{
+Shader "ZeroRP/Unlit"
+{
 //    Properties
 //    {
 //        _MainTex ("_MainTex", 2D) = "white" {}
@@ -231,4 +231,4 @@
 //        //            ENDHLSL
 //        //        }
 //    }
-//}
+}
