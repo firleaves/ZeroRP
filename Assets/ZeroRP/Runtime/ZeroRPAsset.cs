@@ -8,14 +8,9 @@ namespace ZeroRP
     public class ZeroRPAsset : RenderPipelineAsset<ZeroRenderPipeline>
     {
 
-
         // public override string renderPipelineShaderTag => ZeroRenderPipeline.ShaderTagName;
 
-        // protected override RenderPipeline CreatePipeline()
-        // {
-        //     return new ZeroRenderPipeline(this);
-        // }
-         protected override RenderPipeline CreatePipeline()
+        protected override RenderPipeline CreatePipeline()
         {
             return new ZeroRenderPipeline();
         }

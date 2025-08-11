@@ -1,134 +1,130 @@
-// using System;
-// using UnityEngine;
-// using UnityEngine.Profiling;
-// using UnityEngine.Rendering;
-// using UnityEngine.Rendering.RenderGraphModule;
-// using UnityEngine.Experimental.Rendering;
-// using UnityEngine.Rendering.RendererUtils;
-// namespace ZeroRP
-// {
-//     public class GBufferPass
-//     {
+using System;
+using UnityEngine;
+using UnityEngine.Profiling;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering.RendererUtils;
+namespace ZeroRP
+{
+    public class GBufferPass 
+    {
 
-//         private class PassData
-//         {
-//             internal TextureHandle[] GBufferTextureHandles;
-//             internal RendererListHandle RendererListHandle;
-//         }
+        private class PassData
+        {
+            internal TextureHandle[] GBufferTextureHandles;
 
-//         private const string PassName = "GBuffer";
-//         private ProfilingSampler _profilingSampler = new ProfilingSampler(PassName);
 
-//             // Lighting Buffer (不创建纹理)
+            internal RendererListHandle RendererListHandle;
 
-//         private readonly GraphicsFormat[] GBufferFormats = new GraphicsFormat[]
-//         {
-//             GraphicsFormat.R8G8B8A8_UNorm,  // GBuffer0: Albedo (sRGB)
-//             GraphicsFormat.R8G8B8A8_UNorm, // GBuffer1: Specular + Metallic
-//             GraphicsFormat.R8G8B8A8_UNorm, // GBuffer2: Normal + Smoothness
-//             GraphicsFormat.None             // GBuffer3: Lighting (不创建纹理)
-//         };
+        }
 
-//         private readonly string[] GBufferNames = new string[]
-//         {
-//             "_GBuffer0",
-//             "_GBuffer1",
-//             "_GBuffer2",
-//             "_GBuffer3"
-//         };
-//         private ShaderTagId _shaderTagId = new ShaderTagId(PassName);
+        private const string PassName = "GBuffer";
+        private ProfilingSampler _profilingSampler =  new ProfilingSampler(PassName);
 
-//   public static TextureHandle CreateRenderGraphTexture(RenderGraph renderGraph, RenderTextureDescriptor desc, string name, bool clear,
-//             FilterMode filterMode = FilterMode.Point, TextureWrapMode wrapMode = TextureWrapMode.Clamp)
-//         {
-//             TextureDesc rgDesc = new TextureDesc(desc.width, desc.height);
-//             rgDesc.dimension = desc.dimension;
-//             rgDesc.clearBuffer = clear;
-//             rgDesc.bindTextureMS = desc.bindMS;
-//             rgDesc.format = (desc.depthStencilFormat != GraphicsFormat.None) ? desc.depthStencilFormat : desc.graphicsFormat;
-//             rgDesc.slices = desc.volumeDepth;
-//             rgDesc.msaaSamples = (MSAASamples)desc.msaaSamples;
-//             rgDesc.name = name;
-//             rgDesc.enableRandomWrite = desc.enableRandomWrite;
-//             rgDesc.filterMode = filterMode;
-//             rgDesc.wrapMode = wrapMode;
-//             rgDesc.isShadowMap = desc.shadowSamplingMode != ShadowSamplingMode.None && desc.depthStencilFormat != GraphicsFormat.None;
-//             rgDesc.vrUsage = desc.vrUsage;
-//             rgDesc.useDynamicScale = desc.useDynamicScale;
-//             rgDesc.useDynamicScaleExplicit = desc.useDynamicScaleExplicit;
 
-//             return renderGraph.CreateTexture(rgDesc);
-//         }
 
-//         public void Render(RenderGraph renderGraph, ContextContainer frameData, TextureHandle cameraColor, TextureHandle cameraDepth)
-//         {
-//             var cameraData = frameData.Get<CameraData>();
-//             var deferredData = frameData.Get<DeferredData>();
+        private readonly GraphicsFormat[] GBufferFormats = new GraphicsFormat[]
+        {
+            GraphicsFormat.R8G8B8A8_SRGB,
+            GraphicsFormat.R8G8B8A8_UNorm,
+            GraphicsFormat.R8G8B8A8_UNorm,
+            GraphicsFormat.R8G8B8A8_UNorm
+        };
 
-//             using (var builder = renderGraph.AddRasterRenderPass<PassData>(PassName, out var passData, _profilingSampler))
-//             {
-//                 // var gBuffer = passData.GBufferTextureHandles = deferredData.GBuffer;
+        private readonly string[] GBufferNames = new string[]
+        {
+            "_GBuffer0",
+            "_GBuffer1",
+            "_GBuffer2",
+            "_GBuffer3"
+        };
+        
+        private RTHandle _depthRT;
+        private RenderTargetIdentifier _depthID;
 
-//                 // for (int i = 0; i < ZeroRPConstants.GBufferSize; i++)
-//                 // {
-//                 //     if (i == ZeroRPConstants.GBufferLightingIndex)
-//                 //     {
-//                 //         gBuffer[i] = cameraColor;
-//                 //     }
-//                 //     else
-//                 //     {
-//                 //         // 使用相机的实际像素尺寸，确保与深度缓冲区匹配
-//                 //         // int width = cameraData.Camera.pixelWidth;
-//                 //         // int height = cameraData.Camera.pixelHeight;
-                        
-//                 //         // 参考URP的实现方式，但需要转换为TextureDesc
-//                 //         var gbufferSlice = cameraData.CameraTargetDescriptor;
-//                 //         gbufferSlice.depthStencilFormat = GraphicsFormat.None; // 确保不创建深度表面
-//                 //         gbufferSlice.stencilFormat = GraphicsFormat.None;
-//                 //         gbufferSlice.graphicsFormat = GBufferFormats[i];
-                        
-//                 //         // // 使用相机的实际像素尺寸，而不是cameraTargetDescriptor的尺寸
-//                 //         // TextureDesc rgDesc = new TextureDesc(width, height);
-//                 //         // rgDesc.dimension = gbufferSlice.dimension;
-//                 //         // // rgDesc.clearBuffer = true;
-//                 //         // rgDesc.clearColor = Color.clear;
-//                 //         // rgDesc.format = gbufferSlice.graphicsFormat;
-//                 //         // rgDesc.name = GBufferNames[i];
-//                 //         // rgDesc.enableRandomWrite = false;
-//                 //         // rgDesc.filterMode = FilterMode.Point;
-//                 //         // rgDesc.wrapMode = TextureWrapMode.Clamp;
-//                 //         // rgDesc.msaaSamples = MSAASamples.None;
-                        
-//                 //         gBuffer[i] = CreateRenderGraphTexture(renderGraph, gbufferSlice, GBufferNames[i], true);
-//                 //     }
-//                 //     builder.SetRenderAttachment(gBuffer[i], i, AccessFlags.Write);
-//                 // }
-//                 builder.SetRenderAttachment(cameraColor, 0, AccessFlags.Write);
-//                 builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
 
-//                 var rendererDesc = new RendererListDesc(new ShaderTagId[] { _shaderTagId }, cameraData.CullingResults, cameraData.Camera)
-//                 {
-//                     sortingCriteria = SortingCriteria.CommonOpaque,
-//                     renderQueueRange = RenderQueueRange.opaque,
-//                     excludeObjectMotionVectors = false
-//                 };
+        private ShaderTagId _shaderTagId = new ShaderTagId(PassName);
+        
 
-//                 passData.RendererListHandle = renderGraph.CreateRendererList(rendererDesc);
-//                 builder.UseRendererList(passData.RendererListHandle);
-//                 builder.AllowPassCulling(false);
-//                 builder.AllowGlobalStateModification(true);
+        public void Render(RenderGraph renderGraph, ContextContainer frameData, TextureHandle cameraColor, TextureHandle cameraDepth)
+        {
 
-//                 // 设置渲染函数
-//                 builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
-//                 {
-//                     if (!data.RendererListHandle.IsValid())
-//                     {
-//                         Debug.LogError("RendererList is invalid in render function!");
-//                         return;
-//                     }
-//                     context.cmd.DrawRendererList(data.RendererListHandle);
-//                 });
-//             }
-//         }
-//     }
-// }
+
+            var cameraData = frameData.Get<CameraData>();
+            var deferredData = frameData.Get<DeferredData>();
+
+            var testFormat = GraphicsFormat.R8G8B8A8_UNorm;
+            using (var builder = renderGraph.AddRasterRenderPass<PassData>(PassName, out var passData, _profilingSampler))
+            {
+                passData.GBufferTextureHandles = new TextureHandle[4];
+                var gBuffer = passData.GBufferTextureHandles = deferredData.GBuffer;
+                for (int i = 0; i < ZeroRPConstants.GBufferSize; i++)
+                {
+                    if (i == 3)
+                    {
+                        gBuffer[i] = cameraColor;
+                    }
+                    else
+                    {
+                        TextureDesc rgDesc = new TextureDesc(cameraData.Camera.pixelWidth, cameraData.Camera.pixelHeight);
+                        rgDesc.dimension = TextureDimension.Tex2D;
+                        rgDesc.clearBuffer = true;
+                        rgDesc.clearColor = Color.clear;
+                        rgDesc.format = testFormat;
+                        rgDesc.name = GBufferNames[i];
+                        rgDesc.enableRandomWrite = false;
+                        rgDesc.filterMode = FilterMode.Point;
+                        rgDesc.wrapMode = TextureWrapMode.Clamp;
+                        rgDesc.msaaSamples = MSAASamples.None;
+                   
+                        gBuffer[i] = renderGraph.CreateTexture(rgDesc);
+                        if (!gBuffer[i].IsValid())
+                        {
+                            Debug.LogError($"Failed to create GBuffer{i}!");
+                        }
+                    }
+                    
+                    builder.SetRenderAttachment(gBuffer[i], i, AccessFlags.Write);
+                }
+                
+                
+                builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
+              
+
+                var rendererDesc = new RendererListDesc( _shaderTagId , cameraData.CullingResults, cameraData.Camera)
+                {
+                    sortingCriteria = SortingCriteria.CommonOpaque,
+                    renderQueueRange = RenderQueueRange.opaque,
+                    excludeObjectMotionVectors = false
+                };
+
+                passData.RendererListHandle = renderGraph.CreateRendererList(rendererDesc);
+                builder.UseRendererList(passData.RendererListHandle);
+                builder.AllowPassCulling(false);
+                builder.AllowGlobalStateModification(true);
+                // 设置渲染函数
+                builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
+                {
+                    if (!data.RendererListHandle.IsValid())
+                    {
+                        Debug.LogError("RendererList is invalid in render function!");
+                        return;
+                    }
+    
+                    
+                    // 添加调试标记
+                    
+                    // 绘制渲染列表
+                    context.cmd.DrawRendererList(data.RendererListHandle);
+                    
+                    
+                });
+
+
+            }
+        }
+
+       
+    }
+}
