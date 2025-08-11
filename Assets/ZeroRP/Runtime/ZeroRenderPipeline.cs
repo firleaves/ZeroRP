@@ -15,11 +15,11 @@ namespace ZeroRP
         private ZeroRPRenderGraphRecorder _renderGraphRecorder;
         private ContextContainer _contextContainer;
 
-        // private ZeroRPAsset _asset = null;
+            private ZeroRPAsset _asset = null;
 
-        public ZeroRenderPipeline()
+        public ZeroRenderPipeline(ZeroRPAsset asset)
         {
-         
+            _asset = asset;
             InitializeRenderGraph();
         }
 
@@ -34,31 +34,20 @@ namespace ZeroRP
 
         private void InitializeRenderGraph()
         {
-            // _renderGraph = new RenderGraph("ZeroRPRenderGraph");
-            // _renderGraphRecorder = new ZeroRPRenderGraphRecorder();
-            // _contextContainer = new ContextContainer();
-            
-            _renderGraph = new RenderGraph("LiteRPRenderGraph");
+            _renderGraph = new RenderGraph("ZeroRP Render Graph");
             _renderGraphRecorder = new ZeroRPRenderGraphRecorder();
             _contextContainer = new ContextContainer();
         }
 
         private void CleanupRenderGraph()
         {
-            // _contextContainer.Dispose();
-            // _contextContainer = null;
-            //
-            // _renderGraphRecorder?.Dispose();
-            // _renderGraphRecorder = null;
-            //
-            //
-            // _renderGraph.Cleanup();
-            // _renderGraph = null;
-            
-            _contextContainer?.Dispose();
-            _contextContainer = null;
+            _renderGraphRecorder?.Dispose();
             _renderGraphRecorder = null;
-            _renderGraph?.Cleanup();
+
+            // _renderGraphRecorder?.Dispose();
+            _renderGraphRecorder = null;
+
+            _renderGraph.Cleanup();
             _renderGraph = null;
         }
 
@@ -69,16 +58,16 @@ namespace ZeroRP
 
         protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
         {
-            //开始渲染上下文
+             //开始渲染上下文
             BeginContextRendering(context, cameras);
-            
-            //遍历渲染相机
+
             for (int i = 0; i < cameras.Count; i++)
             {
                 Camera camera = cameras[i];
                 RenderCamera(context, camera);
             }
-            //结束渲染图
+
+            //渲染结束，需要调用该API
             _renderGraph.EndFrame();
             //结束渲染上下文
             EndContextRendering(context, cameras);
@@ -89,20 +78,17 @@ namespace ZeroRP
             BeginCameraRendering(context, camera);
             if (!PrepareFrameData(context, camera))
                 return;
-            CommandBuffer cmd = CommandBufferPool.Get(camera.name);
-            // SetupPerCameraShaderConstants(cmd);
-            
-            //!!!! 应为没有设置camera属性，导致一直渲染不出来
+            CommandBuffer cmd = CommandBufferPool.Get($"Render Camera : {camera.name}");
+
             context.SetupCameraProperties(camera);
+            //设置每个相机的Shader环境光参数
+            SetupPerCameraShaderConstants(cmd);
             RecordAndExecuteRenderGraph(context, camera, cmd);
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
             CommandBufferPool.Release(cmd);
             context.Submit();
             EndCameraRendering(context, camera);
-            
-            
-         
         }
 
         private void SetupPerCameraShaderConstants(CommandBuffer cmd)
@@ -126,7 +112,9 @@ namespace ZeroRP
             CameraData cameraData = _contextContainer.GetOrCreate<CameraData>();
             cameraData.Camera = camera;
             cameraData.CullingResults = cullingResults;
-
+            
+            // 初始化cameraTargetDescriptor，参考URP的实现
+            cameraData.CameraTargetDescriptor = CreateRenderTextureDescriptor(camera, 1);
 
             _contextContainer.GetOrCreate<DeferredData>();
             return true;
@@ -176,6 +164,7 @@ namespace ZeroRP
 
             if (camera.targetTexture == null)
             {
+                // 使用相机的实际像素尺寸，而不是Screen.width/height
                 desc = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight);
                 desc.graphicsFormat = SystemInfo.GetGraphicsFormat(DefaultFormat.LDR);
 
@@ -185,6 +174,7 @@ namespace ZeroRP
             {
                 desc = camera.targetTexture.descriptor;
 
+                // 确保使用相机的实际像素尺寸
                 desc.width = camera.pixelWidth;
                 desc.height = camera.pixelHeight;
             }
