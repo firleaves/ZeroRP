@@ -19,22 +19,6 @@ namespace ZeroRP
         private const string PassName = "GBuffer";
         private ProfilingSampler _profilingSampler = new ProfilingSampler(PassName);
 
-
-        private readonly GraphicsFormat[] GBufferFormats = new GraphicsFormat[]
-        {
-            GraphicsFormat.R8G8B8A8_UNorm,  // GBuffer0: Albedo (sRGB)
-            GraphicsFormat.R8G8B8A8_UNorm, // GBuffer1: Specular + Metallic
-            GraphicsFormat.R8G8B8A8_UNorm, // GBuffer2: Normal + Smoothness
-            GraphicsFormat.None             // GBuffer3: Lighting (不创建纹理)
-        };
-
-        private readonly string[] GBufferNames = new string[]
-        {
-            "_GBuffer0",
-            "_GBuffer1",
-            "_GBuffer2",
-            "_GBuffer3"
-        };
         private ShaderTagId _shaderTagId = new ShaderTagId(PassName);
 
         public static TextureHandle CreateRenderGraphTexture(RenderGraph renderGraph, RenderTextureDescriptor desc, string name, bool clear,
@@ -76,29 +60,14 @@ namespace ZeroRP
                     }
                     else
                     {
-                        // 使用相机的实际像素尺寸，确保与深度缓冲区匹配
-                        // int width = cameraData.Camera.pixelWidth;
-                        // int height = cameraData.Camera.pixelHeight;
-
+                  
                         // 参考URP的实现方式，但需要转换为TextureDesc
-                        var gbufferSlice = cameraData.CameraTargetDescriptor;
+                        var gbufferSlice = new RenderTextureDescriptor(cameraData.Camera.pixelWidth, cameraData.Camera.pixelHeight);
                         gbufferSlice.depthStencilFormat = GraphicsFormat.None; // 确保不创建深度表面
                         gbufferSlice.stencilFormat = GraphicsFormat.None;
-                        gbufferSlice.graphicsFormat = GBufferFormats[i];
+                        gbufferSlice.graphicsFormat = ZeroRPConstants.GBufferFormats[i];
 
-                        // // 使用相机的实际像素尺寸，而不是cameraTargetDescriptor的尺寸
-                        // TextureDesc rgDesc = new TextureDesc(width, height);
-                        // rgDesc.dimension = gbufferSlice.dimension;
-                        // // rgDesc.clearBuffer = true;
-                        // rgDesc.clearColor = Color.clear;
-                        // rgDesc.format = gbufferSlice.graphicsFormat;
-                        // rgDesc.name = GBufferNames[i];
-                        // rgDesc.enableRandomWrite = false;
-                        // rgDesc.filterMode = FilterMode.Point;
-                        // rgDesc.wrapMode = TextureWrapMode.Clamp;
-                        // rgDesc.msaaSamples = MSAASamples.None;
-
-                        gBuffer[i] = CreateRenderGraphTexture(renderGraph, gbufferSlice, GBufferNames[i], true);
+                        gBuffer[i] = CreateRenderGraphTexture(renderGraph, gbufferSlice, ZeroRPConstants.GBufferNames[i], true);
                     }
                     builder.SetRenderAttachment(gBuffer[i], i, AccessFlags.Write);
                 }

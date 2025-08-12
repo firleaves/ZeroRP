@@ -49,7 +49,7 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
 Varyings LitGBufferPassVertex(Attributes input)
 {
     Varyings output = (Varyings)0;
-    half3 positionWS = TransformObjectToWorld(input.positionOS);
+    output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
     output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
@@ -57,22 +57,15 @@ Varyings LitGBufferPassVertex(Attributes input)
     output.normalWS = TransformObjectToWorldNormal(input.normalOS);
 
     half3 tangentWS = real3(TransformObjectToWorldDir(input.tangentOS.xyz));
-    real sign = input.tangentOS.w; //* GetOddNegativeScale();
+    real sign = input.tangentOS.w* GetOddNegativeScale();
     output.tangentWS = half4(tangentWS, sign);
 
     return output;
 }
 
-void LitGBufferPassFragment(Varyings input, out half4 GBuffer0 : SV_Target0,out half4 GBuffer1 : SV_Target1,out half4 GBuffer2 : SV_Target2,out half4 GBuffer3 : SV_Target3)
+FragmentOutput LitGBufferPassFragment(Varyings input)
 {
-    // UNITY_SETUP_INSTANCE_ID(input);
 
-    // 临时测试：输出不同颜色到每个 GBuffer
-    // 注意：GBuffer3 会输出到 camera color，这就是为什么 Frame Debugger 只显示 gbuffer3
-    GBuffer0 = half4(1, 0, 0, 1); // 红色 - Albedo
-    GBuffer1 = half4(0, 1, 0, 1); // 绿色 - Specular/Metallic  
-    GBuffer2 = half4(0, 0, 1, 1); // 蓝色 - Normal/Smoothness
-    GBuffer3 = half4(1, 1, 0, 1); // 黄色 - Lighting (输出到camera color)
 
     SurfaceData surfaceData;
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
@@ -83,10 +76,7 @@ void LitGBufferPassFragment(Varyings input, out half4 GBuffer0 : SV_Target0,out 
     BRDFData brdfData;
     InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.smoothness, brdfData);
     
-    FragmentOutput output = BRDFDataToGBuffer(brdfData, inputData, surfaceData.smoothness, half3(0.1, 0.1, 0), surfaceData.occlusion);
-    GBuffer0 = output.GBuffer0;
-    GBuffer1 = output.GBuffer1;
-    GBuffer2 = output.GBuffer2;
-    GBuffer3 = output.GBuffer3;
+    return BRDFDataToGBuffer(brdfData, inputData, surfaceData.smoothness, half3(0.1, 0.1, 0), surfaceData.occlusion);
+
 }
 #endif

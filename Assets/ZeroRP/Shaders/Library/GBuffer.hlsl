@@ -4,21 +4,14 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Assets/ZeroRP/Shaders/Library/BRDF.hlsl"
 
-// struct FragmentOutput
-// {
-//     half4 GBuffer0 : SV_Target0;
-//     half4 GBuffer1 : SV_Target1;
-//     half4 GBuffer2 : SV_Target2;
-//     half4 GBuffer3 : SV_Target3; 
-// };
-
 struct FragmentOutput
 {
-    half4 GBuffer0 ;
-    half4 GBuffer1 ;
-    half4 GBuffer2 ;
-    half4 GBuffer3 ; 
+    half4 GBuffer0 : SV_Target0;
+    half4 GBuffer1 : SV_Target1;
+    half4 GBuffer2 : SV_Target2;
+    half4 GBuffer3 : SV_Target3; 
 };
+
 
 // 使用八面体编码将3D法线压缩到2D
 half3 PackNormal(half3 n)
@@ -54,11 +47,6 @@ FragmentOutput BRDFDataToGBuffer(BRDFData brdfData, InputData inputData, half sm
     output.GBuffer1 = half4(packedSpecular, occlusion);                              // metallic/specular specular        specular        occlusion
     output.GBuffer2 = half4(packedNormalWS, smoothness);                             // encoded-normal    encoded-normal  encoded-normal  smoothness
     output.GBuffer3 = half4(globalIllumination, 1);                                  // GI                GI              GI              unused          (lighting buffer)
-
-    // output.GBuffer0 = half4(1,0,0,0);
-    // output.GBuffer1 = half4(0,1,0,0);
-    // output.GBuffer2 = half4(0,0,1,0);
-    // output.GBuffer3 = half4(1,1,0,0);
     return output;
 }
 

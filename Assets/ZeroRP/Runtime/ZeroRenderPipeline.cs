@@ -113,9 +113,6 @@ namespace ZeroRP
             cameraData.Camera = camera;
             cameraData.CullingResults = cullingResults;
             
-            // 初始化cameraTargetDescriptor，参考URP的实现
-            cameraData.CameraTargetDescriptor = CreateRenderTextureDescriptor(camera, 1);
-
             _contextContainer.GetOrCreate<DeferredData>();
             return true;
         }

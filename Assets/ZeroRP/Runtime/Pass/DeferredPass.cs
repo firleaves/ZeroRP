@@ -8,75 +8,55 @@ namespace ZeroRP
 {
     public class DeferredPass
     {
-        
         private const string PassName = "DeferredLight";
-        
+
         private readonly ProfilingSampler _profilingSampler = new(PassName);
 
         private class PassData
         {
             internal TextureHandle[] GBufferTextureHandles;
-            internal TextureHandle DepthTextureHandle;
 
 
             internal RendererListHandle RendererListHandle;
-            internal RendererListHandle ObjectsWithErrorRendererListHandle;
 
-            internal RendererList RendererList;
-            internal RendererList ObjectsWithErrorRendererList;
         }
-        
-        
+
+
         private Mesh _fullMesh;
         private Material _material;
 
 
         public DeferredPass()
         {
-            
         }
-       
+
         private Mesh CreateFullscreenMesh()
         {
-            var mesh = new Mesh();
-            mesh.name = "Fullscreen Quad";
-    
-            Vector3[] vertices = new Vector3[]
+            Vector3[] positions =
             {
-                new Vector3(-1, -1, 0),  // 左下
-                new Vector3(-1,  1, 0),  // 左上  
-                new Vector3( 1, -1, 0),  // 右下
-                new Vector3( 1,  1, 0)   // 右上
+                new Vector3(-1.0f, 1.0f, 0.0f),
+                new Vector3(-1.0f, -3.0f, 0.0f),
+                new Vector3(3.0f, 1.0f, 0.0f)
             };
-    
-            Vector2[] uvs = new Vector2[]
-            {
-                new Vector2(0, 0),  // 左下
-                new Vector2(0, 1),  // 左上
-                new Vector2(1, 0),  // 右下
-                new Vector2(1, 1)   // 右上
-            };
-    
-            int[] triangles = new int[]
-            {
-                0, 1, 2,  
-                2, 1, 3   
-            };
-    
-            mesh.vertices = vertices;
-            mesh.uv = uvs;
-            mesh.triangles = triangles;
-    
+
+            int[] indices = { 0, 1, 2 };
+
+            Mesh mesh = new Mesh();
+            mesh.indexFormat = IndexFormat.UInt16;
+            mesh.vertices = positions;
+            mesh.triangles = indices;
+
             return mesh;
         }
-        
+
         public void Render(RenderGraph renderGraph, ContextContainer frameData, TextureHandle cameraColor, TextureHandle cameraDepth)
         {
-            if(_fullMesh == null)
+            if (_fullMesh == null)
             {
                 _fullMesh = CreateFullscreenMesh();
             }
-            if(_material == null)
+
+            if (_material == null)
             {
                 _material = new Material(Shader.Find("ZeroRP/DeferredLight"));
             }
@@ -86,20 +66,32 @@ namespace ZeroRP
             var deferredData = frameData.Get<DeferredData>();
             using (var builder = renderGraph.AddRasterRenderPass<PassData>(PassName, out var passData, _profilingSampler))
             {
-                for (int i = 0; i < 3; ++i)
-                {
-                    builder.UseTexture(deferredData.GBuffer[i], AccessFlags.Read);
-                }
-                if (cameraDepth.IsValid()) builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
-                
-                
                 builder.SetRenderAttachment(cameraColor, 0, AccessFlags.Write);
-                
+                builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
+
+                // for (int i = 0; i < deferredData.GBuffer.Length; ++i)
+                // {
+                //     if (i != ZeroRPConstants.GBufferLightingIndex)
+                //     {
+                //         builder.UseTexture(deferredData.GBuffer[i], AccessFlags.Read);
+                //     }
+                // }
+
+                passData.GBufferTextureHandles = deferredData.GBuffer;
+
+
                 builder.AllowPassCulling(false);
                 builder.AllowGlobalStateModification(true);
 
                 builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
                 {
+                    // for (int i = 0; i < data.GBufferTextureHandles.Length; i++)
+                    // {
+                    //     if (i != ZeroRPConstants.GBufferLightingIndex)
+                    //     {
+                    //         _material.SetTexture(ZeroRPConstants.GBufferShaderPropertyIDs[i], data.GBufferTextureHandles[i]);
+                    //     }
+                    // }
                     context.cmd.DrawMesh(_fullMesh, Matrix4x4.identity, _material, 0, 0);
                 });
             }

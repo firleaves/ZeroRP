@@ -30,6 +30,8 @@ namespace ZeroRP
 
         private GBufferPass _gBufferPass = new GBufferPass();
         private DeferredPass _deferredPass = new DeferredPass();
+        private ClearRenderTargetPass _clearRenderTargetPass = new ClearRenderTargetPass();
+        private SkyBoxPass _skyBoxPass = new SkyBoxPass();
 
         public void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
@@ -39,18 +41,13 @@ namespace ZeroRP
             CreateRenderGraphCameraRenderTargets(renderGraph, cameraData);
 
 
-            var clearFlags = cameraData.GetClearFlags();
-
-            // if (clearFlags != RTClearFlags.None)
-            // {
-            //     AddClearRenderTargetPass(renderGraph, cameraData);
-            // }
+            _clearRenderTargetPass.Render(renderGraph, frameData,_colorHandle,_depthHandle);
+           
             //
-            _gBufferPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
-            _deferredPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
+            // _gBufferPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
+            // _deferredPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
             AddDrawOpaqueObjectsPass(renderGraph, cameraData);
-
-            AddDrawSkyBoxPass(renderGraph, cameraData);
+            _skyBoxPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
           
 
             //Editor
@@ -126,33 +123,7 @@ namespace ZeroRP
             _colorHandle = renderGraph.ImportTexture(_colorRTHandle, importInfoColor, importBackbufferColorParams);
             _depthHandle = renderGraph.ImportTexture(_depthRTHandle, importInfoDepth, importBackbufferDepthParams);
         }
-
-        #region Clar RenderTarget
-
-        internal class ClearRenderTargetPassData
-        {
-            internal RTClearFlags ClearFlags { get; set; }
-            internal Color ClearColor { get; set; }
-        }
-
-        private void AddClearRenderTargetPass(RenderGraph renderGraph, CameraData cameraData)
-        {
-            using (var builder = renderGraph.AddRasterRenderPass<ClearRenderTargetPassData>("Clear Render Target Pass", out var passData))
-            {
-                passData.ClearColor = cameraData.GetClearColor();
-                passData.ClearFlags = cameraData.GetClearFlags();
-
-                if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
-                if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
-
-                builder.AllowPassCulling(false);
-
-                builder.SetRenderFunc((ClearRenderTargetPassData data, RasterGraphContext context) => { context.cmd.ClearRenderTarget(data.ClearFlags, data.ClearColor, 1, 0); });
-            }
-        }
-
-        #endregion
-
+        
 
         #region Draw Opaque Objects
 
@@ -161,7 +132,7 @@ namespace ZeroRP
             internal TextureHandle backbufferHandle;
             internal RendererListHandle OpaqueRendererListHandle { get; set; }
         }
-
+        
         private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
         {
             using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
@@ -173,56 +144,23 @@ namespace ZeroRP
                 passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
                 //RenderGraph引用不透明渲染列表
                 builder.UseRendererList(passData.OpaqueRendererListHandle);
-
+        
                 // passData.backbufferHandle = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CurrentActive);
                 // builder.SetRenderAttachment(passData.backbufferHandle, 0, AccessFlags.Write);
                 if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
                 if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
-
+        
                 builder.AllowPassCulling(false);
                 // builder.AllowPassCulling(false);
                 // //TODO 啥意思呢
                 // builder.AllowGlobalStateModification(true);
-
+        
                 builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) =>
                 {
                     context.cmd.DrawRendererList(data.OpaqueRendererListHandle);
                 });
             }
         }
-
-        #endregion
-
-        #region Draw Skybox
-        internal class SkyBoxPassData
-        {
-            internal RendererListHandle skyboxRenderListHandle;
-        }
-        private void AddDrawSkyBoxPass(RenderGraph renderGraph, CameraData cameraData)
-        {
-            using (var builder =
-                   renderGraph.AddRasterRenderPass<SkyBoxPassData>("Draw SkyBox Pass", out var passData))
-            {
-                passData.skyboxRenderListHandle = renderGraph.CreateSkyboxRendererList(cameraData.Camera);
-                builder.UseRendererList(passData.skyboxRenderListHandle);
-
-                if (_colorHandle.IsValid())
-                    builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
-                if (_depthHandle.IsValid())
-                    builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
-
-                builder.AllowPassCulling(false);
-
-                builder.SetRenderFunc((SkyBoxPassData data, RasterGraphContext context) =>
-                {
-                    context.cmd.DrawRendererList(data.skyboxRenderListHandle);
-                });
-            }
-        }
-
-        #endregion
-
-        #region Draw Transparent Objects
 
         #endregion
 
