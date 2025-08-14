@@ -39,14 +39,10 @@ namespace ZeroRP
 
 
             CreateRenderGraphCameraRenderTargets(renderGraph, cameraData);
-
-
             _clearRenderTargetPass.Render(renderGraph, frameData,_colorHandle,_depthHandle);
+            _gBufferPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
            
-            //
-            // _gBufferPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
-            // _deferredPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
-            AddDrawOpaqueObjectsPass(renderGraph, cameraData);
+            _deferredPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
             _skyBoxPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
           
 
@@ -83,14 +79,14 @@ namespace ZeroRP
 
 
             ImportResourceParams importBackbufferColorParams = new ImportResourceParams();
-            importBackbufferColorParams.clearOnFirstUse = clearOnFirstUse;
+            importBackbufferColorParams.clearOnFirstUse = true;
             importBackbufferColorParams.clearColor = clearColor;
-            importBackbufferColorParams.discardOnLastUse = discardColorBackbufferOnLastUse;
+            importBackbufferColorParams.discardOnLastUse = true;
 
             ImportResourceParams importBackbufferDepthParams = new ImportResourceParams();
-            importBackbufferDepthParams.clearOnFirstUse = clearOnFirstUse;
+            importBackbufferDepthParams.clearOnFirstUse = true;
             importBackbufferDepthParams.clearColor = clearColor;
-            importBackbufferDepthParams.discardOnLastUse = discardDepthBackbufferOnLastUse;
+            importBackbufferDepthParams.discardOnLastUse = true;
 
             bool colorRT_sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
             RenderTargetInfo importInfoColor = new RenderTargetInfo();

@@ -32,7 +32,7 @@ Shader "ZeroRP/DeferredLight"
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
-                float3 screenUV : TEXCOORD1;
+                float2 uv : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -40,7 +40,7 @@ Shader "ZeroRP/DeferredLight"
             TEXTURE2D(_GBuffer1);
             TEXTURE2D(_GBuffer2);
             TEXTURE2D(_GBuffer3);
-            SAMPLER(sampler_GT0);
+            SAMPLER(sampler_GBuffer0);
             TEXTURE2D(_DepthTex);
             SAMPLER(sampler_DepthTex);
 
@@ -67,13 +67,16 @@ Shader "ZeroRP/DeferredLight"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
 
-                o.positionCS = TransformObjectToHClip(input.positionOS.xyz);
-
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
                 return o;
             }
 
-            float4 Fragment(Varyings i):SV_TARGET
+            float4 Fragment(Varyings input):SV_TARGET
             {
+                 half4 albedo = SAMPLE_TEXTURE2D(_GBuffer0, sampler_GBuffer0, input.uv);
+                half4 normal = SAMPLE_TEXTURE2D(_GBuffer1, sampler_GBuffer0, input.uv);
+                half4 metallic = SAMPLE_TEXTURE2D(_GBuffer2, sampler_GBuffer0, input.uv);
                 // float4 col0 = SAMPLE_TEXTURE2D(_GT0, sampler_GT0, i.uv);
                 // float4 col1 = SAMPLE_TEXTURE2D(_GT1, sampler_GT0, i.uv);
                 // float4 col2 = SAMPLE_TEXTURE2D(_GT2, sampler_GT0, i.uv);
@@ -102,7 +105,8 @@ Shader "ZeroRP/DeferredLight"
                 // float3 V = normalize(_WorldSpaceCameraPos.xyz - worldPos.xyz);
                 //
                 // float directColor = DirectBRDF(N, V, L, diffuseColor, _MainLightColor, roughness, _Metallic);
-                return float4(1, 0, 0, 1);
+
+                return albedo+normal+metallic;
             }
             ENDHLSL
         }

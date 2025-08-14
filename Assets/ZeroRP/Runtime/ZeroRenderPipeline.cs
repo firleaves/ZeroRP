@@ -140,6 +140,7 @@ namespace ZeroRP
             rgDesc.dimension = desc.dimension;
             rgDesc.clearBuffer = clear;
             rgDesc.bindTextureMS = desc.bindMS;
+            rgDesc.clearColor = Color.black;
             rgDesc.format = (desc.depthStencilFormat != GraphicsFormat.None) ? desc.depthStencilFormat : desc.graphicsFormat;
             rgDesc.slices = desc.volumeDepth;
             rgDesc.msaaSamples = (MSAASamples)desc.msaaSamples;

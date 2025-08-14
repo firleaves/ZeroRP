@@ -17,31 +17,11 @@ namespace ZeroRP
         }
 
         private const string PassName = "GBuffer";
-        private ProfilingSampler _profilingSampler = new ProfilingSampler(PassName);
+        private ProfilingSampler _profilingSampler = new ProfilingSampler("Draw GBuffer");
 
         private ShaderTagId _shaderTagId = new ShaderTagId(PassName);
 
-        public static TextureHandle CreateRenderGraphTexture(RenderGraph renderGraph, RenderTextureDescriptor desc, string name, bool clear,
-                  FilterMode filterMode = FilterMode.Point, TextureWrapMode wrapMode = TextureWrapMode.Clamp)
-        {
-            TextureDesc rgDesc = new TextureDesc(desc.width, desc.height);
-            rgDesc.dimension = desc.dimension;
-            rgDesc.clearBuffer = clear;
-            rgDesc.bindTextureMS = desc.bindMS;
-            rgDesc.format = (desc.depthStencilFormat != GraphicsFormat.None) ? desc.depthStencilFormat : desc.graphicsFormat;
-            rgDesc.slices = desc.volumeDepth;
-            rgDesc.msaaSamples = (MSAASamples)desc.msaaSamples;
-            rgDesc.name = name;
-            rgDesc.enableRandomWrite = desc.enableRandomWrite;
-            rgDesc.filterMode = filterMode;
-            rgDesc.wrapMode = wrapMode;
-            rgDesc.isShadowMap = desc.shadowSamplingMode != ShadowSamplingMode.None && desc.depthStencilFormat != GraphicsFormat.None;
-            rgDesc.vrUsage = desc.vrUsage;
-            rgDesc.useDynamicScale = desc.useDynamicScale;
-            rgDesc.useDynamicScaleExplicit = desc.useDynamicScaleExplicit;
-
-            return renderGraph.CreateTexture(rgDesc);
-        }
+     
 
         public void Render(RenderGraph renderGraph, ContextContainer frameData, TextureHandle cameraColor, TextureHandle cameraDepth)
         {
@@ -50,38 +30,54 @@ namespace ZeroRP
 
             using (var builder = renderGraph.AddRasterRenderPass<PassData>(PassName, out var passData, _profilingSampler))
             {
-                var gBuffer = passData.GBufferTextureHandles = deferredData.GBuffer;
-
+                var gBuffer = new TextureHandle[4];
+                
+                // 创建GBuffer渲染目标
                 for (int i = 0; i < ZeroRPConstants.GBufferSize; i++)
                 {
                     if (i == ZeroRPConstants.GBufferLightingIndex)
                     {
+                        // 光照缓冲区复用主渲染目标
                         gBuffer[i] = cameraColor;
                     }
                     else
                     {
-                  
-                        // 参考URP的实现方式，但需要转换为TextureDesc
-                        var gbufferSlice = new RenderTextureDescriptor(cameraData.Camera.pixelWidth, cameraData.Camera.pixelHeight);
+                        // 创建GBuffer纹理
+                        var gbufferSlice = new RenderTextureDescriptor(Screen.width, Screen.height);
                         gbufferSlice.depthStencilFormat = GraphicsFormat.None; // 确保不创建深度表面
                         gbufferSlice.stencilFormat = GraphicsFormat.None;
                         gbufferSlice.graphicsFormat = ZeroRPConstants.GBufferFormats[i];
-
-                        gBuffer[i] = CreateRenderGraphTexture(renderGraph, gbufferSlice, ZeroRPConstants.GBufferNames[i], true);
+                        gbufferSlice.msaaSamples = 1;
+                        gbufferSlice.useMipMap = false;
+                        gbufferSlice.autoGenerateMips = false;
+                        
+                        gBuffer[i] = ZeroRenderPipeline.CreateRenderGraphTexture(renderGraph, gbufferSlice, ZeroRPConstants.GBufferNames[i], true);
                     }
-                    builder.SetRenderAttachment(gBuffer[i], i, AccessFlags.Write);
+                    
+                    // 设置渲染附件，确保MRT正确配置
+                    // builder.SetRenderAttachment(gBuffer[i], i, AccessFlags.Write);
                 }
+                //
+                // 保存GBuffer引用到帧数据中
+                deferredData.GBuffer = gBuffer;
+                builder.SetRenderAttachment(gBuffer[0], 0, AccessFlags.Write);
+                builder.SetRenderAttachment(gBuffer[1], 1, AccessFlags.Write);
+                builder.SetRenderAttachment(gBuffer[2], 2, AccessFlags.Write);
+                builder.SetRenderAttachment(gBuffer[3], 3, AccessFlags.Write);
+                // 设置深度附件
                 builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
 
-                var rendererDesc = new RendererListDesc(new ShaderTagId[] { _shaderTagId }, cameraData.CullingResults, cameraData.Camera)
+                // 创建渲染列表
+                var rendererDesc = new RendererListDesc(_shaderTagId, cameraData.CullingResults, cameraData.Camera)
                 {
                     sortingCriteria = SortingCriteria.CommonOpaque,
                     renderQueueRange = RenderQueueRange.opaque,
-                    excludeObjectMotionVectors = false
                 };
 
                 passData.RendererListHandle = renderGraph.CreateRendererList(rendererDesc);
                 builder.UseRendererList(passData.RendererListHandle);
+                
+                // 重要：允许全局状态修改，确保MRT设置生效
                 builder.AllowPassCulling(false);
                 builder.AllowGlobalStateModification(true);
 
@@ -93,6 +89,9 @@ namespace ZeroRP
                         Debug.LogError("RendererList is invalid in render function!");
                         return;
                     }
+                    
+                    // 确保MRT设置正确 - 这是关键！
+                    context.cmd.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
                     context.cmd.DrawRendererList(data.RendererListHandle);
                 });
             }

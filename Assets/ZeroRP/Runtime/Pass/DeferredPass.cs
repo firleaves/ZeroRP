@@ -69,29 +69,31 @@ namespace ZeroRP
                 builder.SetRenderAttachment(cameraColor, 0, AccessFlags.Write);
                 builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
 
-                // for (int i = 0; i < deferredData.GBuffer.Length; ++i)
-                // {
-                //     if (i != ZeroRPConstants.GBufferLightingIndex)
-                //     {
-                //         builder.UseTexture(deferredData.GBuffer[i], AccessFlags.Read);
-                //     }
-                // }
+                var idx = 0;
+                for (int i = 0; i < deferredData.GBuffer.Length; ++i)
+                {
+                    if (i != ZeroRPConstants.GBufferLightingIndex)
+                    {
+                        builder.UseTexture(deferredData.GBuffer[i], AccessFlags.Read);
+                        idx++;
+                    }
+                }
 
                 passData.GBufferTextureHandles = deferredData.GBuffer;
 
 
-                builder.AllowPassCulling(false);
+                builder.AllowPassCulling(true);
                 builder.AllowGlobalStateModification(true);
 
                 builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
                 {
-                    // for (int i = 0; i < data.GBufferTextureHandles.Length; i++)
-                    // {
-                    //     if (i != ZeroRPConstants.GBufferLightingIndex)
-                    //     {
-                    //         _material.SetTexture(ZeroRPConstants.GBufferShaderPropertyIDs[i], data.GBufferTextureHandles[i]);
-                    //     }
-                    // }
+                    for (int i = 0; i < data.GBufferTextureHandles.Length; i++)
+                    {
+                        if (i != ZeroRPConstants.GBufferLightingIndex)
+                        {
+                            _material.SetTexture(ZeroRPConstants.GBufferShaderPropertyIDs[i], data.GBufferTextureHandles[i]);
+                        }
+                    }
                     context.cmd.DrawMesh(_fullMesh, Matrix4x4.identity, _material, 0, 0);
                 });
             }

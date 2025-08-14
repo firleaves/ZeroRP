@@ -27,6 +27,7 @@ namespace ZeroRP
                 passData.ClearColor = cameraData.GetClearColor();
                 passData.ClearFlags = cameraData.GetClearFlags();
 
+                // 只设置主渲染目标，不清空GBuffer
                 builder.SetRenderAttachment(cameraColor, 0, AccessFlags.Write);
                 builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
 

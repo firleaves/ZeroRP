@@ -34,7 +34,7 @@ float PackMaterialFlags(uint materialFlags)
 
 FragmentOutput BRDFDataToGBuffer(BRDFData brdfData, InputData inputData, half smoothness, half3 globalIllumination, half occlusion = 1.0)
 {
-    half3 packedNormalWS = PackNormal(inputData.normalWS);
+    half3 packedNormalWS = inputData.normalWS;
 
     uint materialFlags = 0;
     

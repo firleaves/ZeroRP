@@ -76,7 +76,12 @@ FragmentOutput LitGBufferPassFragment(Varyings input)
     BRDFData brdfData;
     InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.smoothness, brdfData);
     
-    return BRDFDataToGBuffer(brdfData, inputData, surfaceData.smoothness, half3(0.1, 0.1, 0), surfaceData.occlusion);
+    FragmentOutput o =  BRDFDataToGBuffer(brdfData, inputData, surfaceData.smoothness, half3(0.1, 0.1, 0), surfaceData.occlusion);
+    // o.GBuffer0 = half4(1,0,0,1);
+    // o.GBuffer1 = half4(0,1,0,1);
+    // o.GBuffer2 = half4(0,0,1,1);
+    // o.GBuffer0 = half4(1,1,0,1);
+    return o;
 
 }
 #endif
