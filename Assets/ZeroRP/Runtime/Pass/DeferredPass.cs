@@ -72,11 +72,11 @@ namespace ZeroRP
                 var idx = 0;
                 for (int i = 0; i < deferredData.GBuffer.Length; ++i)
                 {
-                    if (i != ZeroRPConstants.GBufferLightingIndex)
-                    {
+                    // if (i != ZeroRPConstants.GBufferLightingIndex)
+                    // {
                         builder.UseTexture(deferredData.GBuffer[i], AccessFlags.Read);
                         idx++;
-                    }
+                    // }
                 }
 
                 passData.GBufferTextureHandles = deferredData.GBuffer;
@@ -89,10 +89,10 @@ namespace ZeroRP
                 {
                     for (int i = 0; i < data.GBufferTextureHandles.Length; i++)
                     {
-                        if (i != ZeroRPConstants.GBufferLightingIndex)
-                        {
+                        // if (i != ZeroRPConstants.GBufferLightingIndex)
+                        // {
                             _material.SetTexture(ZeroRPConstants.GBufferShaderPropertyIDs[i], data.GBufferTextureHandles[i]);
-                        }
+                        // }
                     }
                     context.cmd.DrawMesh(_fullMesh, Matrix4x4.identity, _material, 0, 0);
                 });

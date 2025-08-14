@@ -66,9 +66,17 @@ Shader "ZeroRP/DeferredLight"
                 Varyings o = (Varyings)0;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
-
-                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
-                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+  o.positionCS = float4(
+                    input.vertexID <= 1 ? -1.0 : 3.0,
+                    input.vertexID == 1 ? 3.0 : -1.0,
+                    0.0, 1.0
+                );
+                o.uv = float2(
+                    input.vertexID <= 1 ? 0.0 : 2.0,
+                    input.vertexID == 1 ? 2.0 : 0.0
+                );
+                // o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                // o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
                 return o;
             }
 
@@ -80,7 +88,7 @@ Shader "ZeroRP/DeferredLight"
                 // float4 col0 = SAMPLE_TEXTURE2D(_GT0, sampler_GT0, i.uv);
                 // float4 col1 = SAMPLE_TEXTURE2D(_GT1, sampler_GT0, i.uv);
                 // float4 col2 = SAMPLE_TEXTURE2D(_GT2, sampler_GT0, i.uv);
-                // float4 col3 = SAMPLE_TEXTURE2D(_GT3, sampler_GT0, i.uv);
+                float4 col3 = SAMPLE_TEXTURE2D(_GBuffer3, sampler_GBuffer0, input.uv);
                 //
                 // float3 diffuseColor = col0.rgb;
                 // float occlusion = col0.a;
@@ -106,7 +114,7 @@ Shader "ZeroRP/DeferredLight"
                 //
                 // float directColor = DirectBRDF(N, V, L, diffuseColor, _MainLightColor, roughness, _Metallic);
 
-                return albedo+normal+metallic;
+                return albedo+normal*0.5+metallic+col3;
             }
             ENDHLSL
         }

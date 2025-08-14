@@ -9,13 +9,13 @@ namespace ZeroRP
         public const int GBufferAlbedoIndex = 0;      // Albedo + Occlusion
         public const int GBufferNormalIndex = 1;      // Normal + Smoothness
         public const int GBufferMetallicIndex = 2;    // Metallic + Specular
-        public const int GBufferLightingIndex = 3;    // Lighting (复用 cameraColor)
+        public const int GBufferLightingIndex = 3;    // Lighting
         internal static readonly GraphicsFormat[] GBufferFormats = new GraphicsFormat[]
         {
             GraphicsFormat.R8G8B8A8_SRGB,
             GraphicsFormat.R8G8B8A8_UNorm,
             GraphicsFormat.R8G8B8A8_UNorm,
-            GraphicsFormat.None // GBuffer3: Lighting 
+            GraphicsFormat.R8G8B8A8_UNorm 
         };
 
         internal static readonly string[] GBufferNames = new string[]

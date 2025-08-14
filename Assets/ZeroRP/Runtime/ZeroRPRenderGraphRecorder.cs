@@ -20,8 +20,12 @@ namespace ZeroRP
             new ShaderTagId("ExampleLightModeTag")
         }; //渲染标签IDs
 
+        internal class InitRenderGraphFramePassData
+        {
+        }
+
         private static readonly ShaderTagId s_shaderTagId = new ShaderTagId("SRPDefaultUnlit"); //渲染标签ID
-        
+
         private TextureHandle _colorHandle;
         private TextureHandle _depthHandle;
 
@@ -37,14 +41,34 @@ namespace ZeroRP
         {
             var cameraData = frameData.Get<CameraData>();
 
+//             using (var builder = renderGraph.AddUnsafePass<InitRenderGraphFramePassData>("Init RenderGraph Frame Pass", out var passData,
+//                        new ProfilingSampler("Init RenderGraph Frame Pass")))
+//             {
+//                 builder.AllowPassCulling(false);
+//                 builder.SetRenderFunc((InitRenderGraphFramePassData data, UnsafeGraphContext context) =>
+//                 {
+//                     UnsafeCommandBuffer cmd = context.cmd;
+// #if UNITY_EDITOR
+//                     float time = Application.isPlaying ? Time.time : Time.realtimeSinceStartup;
+// #else
+//                     float time = Time.time;
+// #endif
+//                     float deltaTime = Time.deltaTime;
+//                     float smoothDeltaTime = Time.smoothDeltaTime;
+//
+//                     
+//                 });
+//             }
 
             CreateRenderGraphCameraRenderTargets(renderGraph, cameraData);
-            _clearRenderTargetPass.Render(renderGraph, frameData,_colorHandle,_depthHandle);
+            // _clearRenderTargetPass.Render(renderGraph, frameData,_colorHandle,_depthHandle);
+
+
             _gBufferPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
-           
+
             _deferredPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
-            _skyBoxPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
-          
+            // _skyBoxPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
+
 
             //Editor
             AddEditorRenderTargetPass(renderGraph);
@@ -54,20 +78,32 @@ namespace ZeroRP
 
         private void CreateRenderGraphCameraRenderTargets(RenderGraph renderGraph, CameraData cameraData)
         {
-            var targetTexture = cameraData.Camera.targetTexture;
-            var cameraTargetTexture = targetTexture;
-            bool isBuildInTexture = (cameraTargetTexture == null);
-            bool isCameraTargetOffscreenDepth = !isBuildInTexture && targetTexture.format == RenderTextureFormat.Depth;
-            RenderTargetIdentifier targetColorId = isBuildInTexture ? BuiltinRenderTextureType.CameraTarget : new RenderTargetIdentifier(cameraTargetTexture);
+            var colorDescriptor = new RenderTextureDescriptor(Screen.width, Screen.height, RenderTextureFormat.ARGB32)
+            {
+                useMipMap = false,
+                autoGenerateMips = false,
+                msaaSamples = 1
+            };
+
             if (_colorRTHandle == null)
             {
-                _colorRTHandle = RTHandles.Alloc(targetColorId, "Color RT");
+                RenderTexture rt = new RenderTexture(colorDescriptor);
+                rt.Create();
+                _colorRTHandle = RTHandles.Alloc(rt, name: "BackBuffer color");
             }
 
-            RenderTargetIdentifier targetDepthId = isBuildInTexture ? BuiltinRenderTextureType.Depth : new RenderTargetIdentifier(cameraTargetTexture);
+            var depthDescriptor = new RenderTextureDescriptor(Screen.width, Screen.height, RenderTextureFormat.Depth, 24)
+            {
+                useMipMap = false,
+                autoGenerateMips = false,
+                msaaSamples = 1
+            };
+
             if (_depthRTHandle == null)
             {
-                _depthRTHandle = RTHandles.Alloc(targetDepthId, "Depth RT");
+                RenderTexture rt = new RenderTexture(depthDescriptor);
+                rt.Create();
+                _depthRTHandle = RTHandles.Alloc(rt, name: "BackBuffer depth");
             }
 
             Color clearColor = cameraData.GetClearColor();
@@ -75,51 +111,53 @@ namespace ZeroRP
 
             bool clearOnFirstUse = !renderGraph.nativeRenderPassesEnabled;
             bool discardColorBackbufferOnLastUse = !renderGraph.nativeRenderPassesEnabled;
-            bool discardDepthBackbufferOnLastUse = !isCameraTargetOffscreenDepth;
+            bool discardDepthBackbufferOnLastUse = false;
 
+            ImportResourceParams importBackbufferColorParams = new ImportResourceParams
+            {
+                clearOnFirstUse = clearOnFirstUse,
+                clearColor = clearColor,
+                discardOnLastUse = discardColorBackbufferOnLastUse
+            };
 
-            ImportResourceParams importBackbufferColorParams = new ImportResourceParams();
-            importBackbufferColorParams.clearOnFirstUse = true;
-            importBackbufferColorParams.clearColor = clearColor;
-            importBackbufferColorParams.discardOnLastUse = true;
+            ImportResourceParams importBackbufferDepthParams = new ImportResourceParams
+            {
+                clearOnFirstUse = clearOnFirstUse,
+                clearColor = clearColor,
+                discardOnLastUse = discardDepthBackbufferOnLastUse
+            };
 
-            ImportResourceParams importBackbufferDepthParams = new ImportResourceParams();
-            importBackbufferDepthParams.clearOnFirstUse = true;
-            importBackbufferDepthParams.clearColor = clearColor;
-            importBackbufferDepthParams.discardOnLastUse = true;
+#if UNITY_EDITOR
+            if (cameraData.Camera.cameraType == CameraType.SceneView)
+                importBackbufferDepthParams.discardOnLastUse = false;
+#endif
 
             bool colorRT_sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
-            RenderTargetInfo importInfoColor = new RenderTargetInfo();
-            RenderTargetInfo importInfoDepth;
-            if (isBuildInTexture)
-            {
-                importInfoColor.width = cameraData.Camera.pixelWidth;
-                importInfoColor.height = cameraData.Camera.pixelHeight;
-                importInfoColor.volumeDepth = 1;
-                importInfoColor.msaaSamples = 1;
-                importInfoColor.format = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB);
-                importInfoColor.bindMS = false;
 
-                importInfoDepth = importInfoColor;
-                importInfoDepth.format = SystemInfo.GetGraphicsFormat(DefaultFormat.DepthStencil);
-            }
-            else
+            RenderTargetInfo importInfoColor = new RenderTargetInfo
             {
-                importInfoColor.width = cameraTargetTexture.width;
-                importInfoColor.height = cameraTargetTexture.height;
-                importInfoColor.volumeDepth = cameraTargetTexture.volumeDepth;
-                importInfoColor.msaaSamples = cameraTargetTexture.antiAliasing;
-                importInfoColor.format = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB);
-                importInfoColor.bindMS = false;
+                width = Screen.width,
+                height = Screen.height,
+                volumeDepth = 1,
+                msaaSamples = 1,
+                format = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB),
+                bindMS = false
+            };
 
-                importInfoDepth = importInfoColor;
-                importInfoDepth.format = SystemInfo.GetGraphicsFormat(DefaultFormat.DepthStencil);
-            }
+            RenderTargetInfo importInfoDepth = new RenderTargetInfo
+            {
+                width = Screen.width,
+                height = Screen.height,
+                volumeDepth = 1,
+                msaaSamples = 1,
+                format = SystemInfo.GetGraphicsFormat(DefaultFormat.DepthStencil),
+                bindMS = false
+            };
 
             _colorHandle = renderGraph.ImportTexture(_colorRTHandle, importInfoColor, importBackbufferColorParams);
             _depthHandle = renderGraph.ImportTexture(_depthRTHandle, importInfoDepth, importBackbufferDepthParams);
         }
-        
+
 
         #region Draw Opaque Objects
 
@@ -128,7 +166,7 @@ namespace ZeroRP
             internal TextureHandle backbufferHandle;
             internal RendererListHandle OpaqueRendererListHandle { get; set; }
         }
-        
+
         private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
         {
             using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
@@ -140,21 +178,18 @@ namespace ZeroRP
                 passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
                 //RenderGraph引用不透明渲染列表
                 builder.UseRendererList(passData.OpaqueRendererListHandle);
-        
+
                 // passData.backbufferHandle = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CurrentActive);
                 // builder.SetRenderAttachment(passData.backbufferHandle, 0, AccessFlags.Write);
                 if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
                 if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
-        
+
                 builder.AllowPassCulling(false);
                 // builder.AllowPassCulling(false);
                 // //TODO 啥意思呢
                 // builder.AllowGlobalStateModification(true);
-        
-                builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) =>
-                {
-                    context.cmd.DrawRendererList(data.OpaqueRendererListHandle);
-                });
+
+                builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) => { context.cmd.DrawRendererList(data.OpaqueRendererListHandle); });
             }
         }
 
@@ -167,8 +202,5 @@ namespace ZeroRP
         public void Dispose()
         {
         }
-
-
-     
     }
 }

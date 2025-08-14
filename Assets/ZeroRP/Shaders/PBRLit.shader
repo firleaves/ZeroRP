@@ -56,16 +56,14 @@
             {
                 "LightMode" = "GBuffer"
             }
-        //    Blend[_SrcBlend][_DstBlend]
            ZWrite On
-        //    Cull[_Cull]
 
             HLSLPROGRAM
             #pragma target 4.5
 
             // Deferred Rendering Path does not support the OpenGL-based graphics API:
             // Desktop OpenGL, OpenGL ES 3.0, WebGL 2.0.
-            // #pragma exclude_renderers gles3 glcore
+            #pragma exclude_renderers gles3 glcore
 
             // -------------------------------------
             // Shader Stages
@@ -76,7 +74,8 @@
             //  Keywords
             // #pragma shader_feature_local _NORMALMAP
             // #pragma shader_feature_local_fragment _ALPHATEST_ON
-
+#pragma multi_compile_instancing
+            #pragma instancing_options renderinglayer
 
             #include "Assets/ZeroRP/Shaders/PBRLitInput.hlsl"
             #include "Assets/ZeroRP/Shaders/PBRLitGBufferPass.hlsl"

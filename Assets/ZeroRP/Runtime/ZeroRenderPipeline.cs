@@ -78,7 +78,7 @@ namespace ZeroRP
             BeginCameraRendering(context, camera);
             if (!PrepareFrameData(context, camera))
                 return;
-            CommandBuffer cmd = CommandBufferPool.Get($"Render Camera : {camera.name}");
+            CommandBuffer cmd = CommandBufferPool.Get();
 
             context.SetupCameraProperties(camera);
             //设置每个相机的Shader环境光参数
@@ -128,7 +128,6 @@ namespace ZeroRP
                 currentFrameIndex = Time.frameCount
             };
             _renderGraph.BeginRecording(renderGraphParameters);
-            //录制时间线
             _renderGraphRecorder.RecordRenderGraph(_renderGraph, _contextContainer);
             _renderGraph.EndRecordingAndExecute();
         }

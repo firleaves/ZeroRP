@@ -7,7 +7,6 @@ namespace ZeroRP
     public class DeferredData : ContextItem
     {
         public TextureHandle[] GBuffer { get;  set; } = new TextureHandle[ZeroRPConstants.GBufferSize];
-
         public override void Reset()
         {
             for (int i = 0; i < GBuffer.Length; i++)

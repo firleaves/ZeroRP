@@ -65,8 +65,6 @@ Varyings LitGBufferPassVertex(Attributes input)
 
 FragmentOutput LitGBufferPassFragment(Varyings input)
 {
-
-
     SurfaceData surfaceData;
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
     
@@ -77,10 +75,10 @@ FragmentOutput LitGBufferPassFragment(Varyings input)
     InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.smoothness, brdfData);
     
     FragmentOutput o =  BRDFDataToGBuffer(brdfData, inputData, surfaceData.smoothness, half3(0.1, 0.1, 0), surfaceData.occlusion);
-    // o.GBuffer0 = half4(1,0,0,1);
-    // o.GBuffer1 = half4(0,1,0,1);
-    // o.GBuffer2 = half4(0,0,1,1);
-    // o.GBuffer0 = half4(1,1,0,1);
+    o.GBuffer0 = half4(1,0,0,0);
+    o.GBuffer1 = half4(0,1,0,0);
+    o.GBuffer2 = half4(0,0,1,0);
+    o.GBuffer3 = half4(1,1,0,0);
     return o;
 
 }

@@ -27,13 +27,17 @@ namespace ZeroRP
                 passData.ClearColor = cameraData.GetClearColor();
                 passData.ClearFlags = cameraData.GetClearFlags();
 
-                // 只设置主渲染目标，不清空GBuffer
                 builder.SetRenderAttachment(cameraColor, 0, AccessFlags.Write);
                 builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
 
                 builder.AllowPassCulling(false);
+                builder.AllowGlobalStateModification(true);
 
-                builder.SetRenderFunc((ClearRenderTargetPassData data, RasterGraphContext context) => { context.cmd.ClearRenderTarget(data.ClearFlags, data.ClearColor, 1, 0); });
+                builder.SetRenderFunc((ClearRenderTargetPassData data, RasterGraphContext context) =>
+                { 
+                    context.cmd.SetupCameraProperties(cameraData.Camera);
+                    context.cmd.ClearRenderTarget(data.ClearFlags, data.ClearColor, 1, 0);
+                });
             }
         }
     }
