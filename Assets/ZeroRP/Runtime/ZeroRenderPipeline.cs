@@ -113,6 +113,9 @@ namespace ZeroRP
             cameraData.Camera = camera;
             cameraData.CullingResults = cullingResults;
             
+            // 初始化相机的渲染目标描述符
+            cameraData.CameraTargetDescriptor = CreateRenderTextureDescriptor(camera, 1);
+            
             _contextContainer.GetOrCreate<DeferredData>();
             return true;
         }
@@ -161,7 +164,6 @@ namespace ZeroRP
 
             if (camera.targetTexture == null)
             {
-                // 使用相机的实际像素尺寸，而不是Screen.width/height
                 desc = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight);
                 desc.graphicsFormat = SystemInfo.GetGraphicsFormat(DefaultFormat.LDR);
 

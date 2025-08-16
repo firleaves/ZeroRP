@@ -39,7 +39,7 @@ namespace ZeroRP
                 for (int i = 0; i < ZeroRPConstants.GBufferSize; i++)
                 {
                     // 创建GBuffer纹理
-                    var gBufferRTDesc = new RenderTextureDescriptor(Screen.width, Screen.height)
+                    var gBufferRTDesc = new RenderTextureDescriptor(cameraData.CameraTargetDescriptor.width, cameraData.CameraTargetDescriptor.height)
                     {
                         depthStencilFormat = GraphicsFormat.None, // 确保不创建深度表面
                         stencilFormat = GraphicsFormat.None,
@@ -53,13 +53,13 @@ namespace ZeroRP
 
                     builder.SetRenderAttachment(gBuffer[i], i, AccessFlags.Write);
                 }
-                // var depthDesc = new TextureDesc(Screen.width, Screen.height);
-                // depthDesc.depthBufferBits = DepthBits.Depth32;
-                // var depthTexture = renderGraph.CreateTexture(depthDesc);
+                var depthDesc = new TextureDesc(cameraData.CameraTargetDescriptor.width, cameraData.CameraTargetDescriptor.height);
+                depthDesc.depthBufferBits = DepthBits.Depth32;
+                var depthTexture = renderGraph.CreateTexture(depthDesc);
                 deferredData.GBuffer = gBuffer;
 
                 // 设置深度附件
-                builder.SetRenderAttachmentDepth(cameraDepth, AccessFlags.Write);
+                builder.SetRenderAttachmentDepth(depthTexture, AccessFlags.Write);
 
                 // 创建渲染列表
                 var rendererDesc = new RendererListDesc(_shaderTagId, cameraData.CullingResults, cameraData.Camera)

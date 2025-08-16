@@ -8,11 +8,12 @@ namespace ZeroRP
         public Camera Camera { get; set; }
         public CullingResults CullingResults { get; set; }
 
-
+        public RenderTextureDescriptor CameraTargetDescriptor { get; set; }
         public override void Reset()
         {
             Camera = null;
             CullingResults = default;
+            CameraTargetDescriptor = default;
         }
 
         public float GetCameraAspectRatio()

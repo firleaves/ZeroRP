@@ -36,29 +36,14 @@ namespace ZeroRP
         private DeferredPass _deferredPass = new DeferredPass();
         private ClearRenderTargetPass _clearRenderTargetPass = new ClearRenderTargetPass();
         private SkyBoxPass _skyBoxPass = new SkyBoxPass();
-
+#if UNITY_EDITOR
+        private EditorRenderTargetPass _editorRenderTargetPass = new EditorRenderTargetPass();
+        private EditorGizmoPass _editorGizmoPass = new EditorGizmoPass();
+#endif
         public void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             var cameraData = frameData.Get<CameraData>();
 
-//             using (var builder = renderGraph.AddUnsafePass<InitRenderGraphFramePassData>("Init RenderGraph Frame Pass", out var passData,
-//                        new ProfilingSampler("Init RenderGraph Frame Pass")))
-//             {
-//                 builder.AllowPassCulling(false);
-//                 builder.SetRenderFunc((InitRenderGraphFramePassData data, UnsafeGraphContext context) =>
-//                 {
-//                     UnsafeCommandBuffer cmd = context.cmd;
-// #if UNITY_EDITOR
-//                     float time = Application.isPlaying ? Time.time : Time.realtimeSinceStartup;
-// #else
-//                     float time = Time.time;
-// #endif
-//                     float deltaTime = Time.deltaTime;
-//                     float smoothDeltaTime = Time.smoothDeltaTime;
-//
-//                     
-//                 });
-//             }
 
             CreateRenderGraphCameraRenderTargets(renderGraph, cameraData);
             // _clearRenderTargetPass.Render(renderGraph, frameData,_colorHandle,_depthHandle);
@@ -70,42 +55,52 @@ namespace ZeroRP
             // _skyBoxPass.Render(renderGraph, frameData, _colorHandle, _depthHandle);
 
 
+#if UNITY_EDITOR
             //Editor
-            AddEditorRenderTargetPass(renderGraph);
-            AddDrawEditorGizmoPass(renderGraph, cameraData, GizmoSubset.PreImageEffects);
+            _editorRenderTargetPass.Render(renderGraph);
+            _editorGizmoPass.Render(renderGraph, cameraData, GizmoSubset.PreImageEffects, _colorHandle, _depthHandle);
+            _editorGizmoPass.Render(renderGraph, cameraData, GizmoSubset.PostImageEffects, _colorHandle, _depthHandle);
+#endif
         }
 
 
         private void CreateRenderGraphCameraRenderTargets(RenderGraph renderGraph, CameraData cameraData)
         {
-            var colorDescriptor = new RenderTextureDescriptor(Screen.width, Screen.height, RenderTextureFormat.ARGB32)
+            int cameraWidth = cameraData.CameraTargetDescriptor.width;
+            int cameraHeight = cameraData.CameraTargetDescriptor.height;
+
+            var colorDescriptor = new RenderTextureDescriptor(cameraWidth, cameraHeight, RenderTextureFormat.ARGB32)
             {
                 useMipMap = false,
                 autoGenerateMips = false,
-                msaaSamples = 1
+                msaaSamples = 1,
+                depthBufferBits = 0  // 颜色RT不需要深度
             };
 
-            if (_colorRTHandle == null)
-            {
-                RenderTexture rt = new RenderTexture(colorDescriptor);
-                rt.Create();
-                _colorRTHandle = RTHandles.Alloc(rt, name: "BackBuffer color");
-            }
 
-            var depthDescriptor = new RenderTextureDescriptor(Screen.width, Screen.height, RenderTextureFormat.Depth, 24)
+
+            var depthDescriptor = new RenderTextureDescriptor(cameraWidth, cameraHeight)
             {
                 useMipMap = false,
                 autoGenerateMips = false,
-                msaaSamples = 1
+                msaaSamples = 1,
+                graphicsFormat = SystemInfo.GetGraphicsFormat(DefaultFormat.DepthStencil),
+                depthBufferBits = 24
             };
 
-            if (_depthRTHandle == null)
+            if (_colorRTHandle == null || !RTHandleMatches(_colorRTHandle, colorDescriptor))
             {
-                RenderTexture rt = new RenderTexture(depthDescriptor);
-                rt.Create();
-                _depthRTHandle = RTHandles.Alloc(rt, name: "BackBuffer depth");
+                RTHandles.Release(_colorRTHandle);
+                _colorRTHandle = RTHandles.Alloc(colorDescriptor, name: "BackBuffer color");
             }
 
+            if (_depthRTHandle == null || !RTHandleMatches(_depthRTHandle, depthDescriptor))
+            {
+                RTHandles.Release(_depthRTHandle);
+                _depthRTHandle = RTHandles.Alloc(depthDescriptor, name: "BackBuffer depth");
+            }
+
+            // 6. 设置清除参数
             Color clearColor = cameraData.GetClearColor();
             RTClearFlags clearFlags = cameraData.GetClearFlags();
 
@@ -132,12 +127,12 @@ namespace ZeroRP
                 importBackbufferDepthParams.discardOnLastUse = false;
 #endif
 
-            bool colorRT_sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
+            bool colorRT_sRGB = QualitySettings.activeColorSpace == ColorSpace.Linear;
 
             RenderTargetInfo importInfoColor = new RenderTargetInfo
             {
-                width = Screen.width,
-                height = Screen.height,
+                width = cameraData.CameraTargetDescriptor.width,
+                height = cameraData.CameraTargetDescriptor.height,
                 volumeDepth = 1,
                 msaaSamples = 1,
                 format = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, colorRT_sRGB),
@@ -146,8 +141,8 @@ namespace ZeroRP
 
             RenderTargetInfo importInfoDepth = new RenderTargetInfo
             {
-                width = Screen.width,
-                height = Screen.height,
+                width = cameraData.CameraTargetDescriptor.width,
+                height = cameraData.CameraTargetDescriptor.height,
                 volumeDepth = 1,
                 msaaSamples = 1,
                 format = SystemInfo.GetGraphicsFormat(DefaultFormat.DepthStencil),
@@ -158,49 +153,67 @@ namespace ZeroRP
             _depthHandle = renderGraph.ImportTexture(_depthRTHandle, importInfoDepth, importBackbufferDepthParams);
         }
 
-
-        #region Draw Opaque Objects
-
-        internal class DrawOpaqueObjectsPassData
+        // 辅助方法：检查RTHandle是否匹配描述符
+        private bool RTHandleMatches(RTHandle handle, RenderTextureDescriptor descriptor)
         {
-            internal TextureHandle backbufferHandle;
-            internal RendererListHandle OpaqueRendererListHandle { get; set; }
+            if (handle == null || handle.rt == null)
+                return false;
+
+            var rt = handle.rt;
+            return rt.width == descriptor.width &&
+                   rt.height == descriptor.height &&
+                   rt.format == descriptor.colorFormat &&
+                   rt.antiAliasing == descriptor.msaaSamples;
         }
 
-        private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
-        {
-            using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
-            {
-                //创建不透明对象渲染列表
-                var opaqueRendererDesc = new RendererListDesc(s_shaderTagId, cameraData.CullingResults, cameraData.Camera);
-                opaqueRendererDesc.sortingCriteria = SortingCriteria.CommonOpaque;
-                opaqueRendererDesc.renderQueueRange = RenderQueueRange.opaque;
-                passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
-                //RenderGraph引用不透明渲染列表
-                builder.UseRendererList(passData.OpaqueRendererListHandle);
+  
 
-                // passData.backbufferHandle = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CurrentActive);
-                // builder.SetRenderAttachment(passData.backbufferHandle, 0, AccessFlags.Write);
-                if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
-                if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
-
-                builder.AllowPassCulling(false);
-                // builder.AllowPassCulling(false);
-                // //TODO 啥意思呢
-                // builder.AllowGlobalStateModification(true);
-
-                builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) => { context.cmd.DrawRendererList(data.OpaqueRendererListHandle); });
-            }
-        }
-
-        #endregion
-
-
-        partial void AddEditorRenderTargetPass(RenderGraph renderGraph);
-        partial void AddDrawEditorGizmoPass(RenderGraph renderGraph, CameraData cameraData, GizmoSubset gizmoSubset);
 
         public void Dispose()
         {
+            RTHandles.Release(_colorRTHandle);
+            _colorRTHandle = null;
+            RTHandles.Release(_depthRTHandle);
+            _depthRTHandle = null;
         }
     }
 }
+
+
+
+
+    //   #region Draw Opaque Objects
+
+    //     internal class DrawOpaqueObjectsPassData
+    //     {
+    //         internal TextureHandle backbufferHandle;
+    //         internal RendererListHandle OpaqueRendererListHandle { get; set; }
+    //     }
+
+    //     private void AddDrawOpaqueObjectsPass(RenderGraph renderGraph, CameraData cameraData)
+    //     {
+    //         using (var builder = renderGraph.AddRasterRenderPass<DrawOpaqueObjectsPassData>("Draw Opaque Objects Pass", out var passData))
+    //         {
+    //             //创建不透明对象渲染列表
+    //             var opaqueRendererDesc = new RendererListDesc(s_shaderTagId, cameraData.CullingResults, cameraData.Camera);
+    //             opaqueRendererDesc.sortingCriteria = SortingCriteria.CommonOpaque;
+    //             opaqueRendererDesc.renderQueueRange = RenderQueueRange.opaque;
+    //             passData.OpaqueRendererListHandle = renderGraph.CreateRendererList(opaqueRendererDesc);
+    //             //RenderGraph引用不透明渲染列表
+    //             builder.UseRendererList(passData.OpaqueRendererListHandle);
+
+    //             // passData.backbufferHandle = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CurrentActive);
+    //             // builder.SetRenderAttachment(passData.backbufferHandle, 0, AccessFlags.Write);
+    //             if (_colorHandle.IsValid()) builder.SetRenderAttachment(_colorHandle, 0, AccessFlags.Write);
+    //             if (_depthHandle.IsValid()) builder.SetRenderAttachmentDepth(_depthHandle, AccessFlags.Write);
+
+    //             builder.AllowPassCulling(false);
+    //             // builder.AllowPassCulling(false);
+    //             // //TODO 啥意思呢
+    //             // builder.AllowGlobalStateModification(true);
+
+    //             builder.SetRenderFunc((DrawOpaqueObjectsPassData data, RasterGraphContext context) => { context.cmd.DrawRendererList(data.OpaqueRendererListHandle); });
+    //         }
+    //     }
+
+    //     #endregion
